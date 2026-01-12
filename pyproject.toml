@@ -15,6 +15,7 @@ project = "valutatrade_hub.cli.interface:main"
 [tool.poetry.dependencies]
 python = "^3.12"
 prettytable = "^3.17.0"
+prompt = "^0.4.1"
 
 
 [tool.poetry.group.dev.dependencies]
