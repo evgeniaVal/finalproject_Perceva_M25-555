@@ -114,7 +114,7 @@ class Wallet:
             or not currency_code.strip().isupper()
         ):
             raise ValueError("Currency code must be a non-empty uppercase string.")
-        self.currency_code = currency_code
+        self.currency_code = currency_code.strip()
         self.balance = float(initial_balance)
 
     def deposit(self, amount: float) -> None:
