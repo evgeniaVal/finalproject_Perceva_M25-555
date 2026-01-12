@@ -47,7 +47,7 @@ class User:
         hashed_password: str,
         salt: str,
         registration_date: datetime,
-    ):
+    ) -> None:
         if not user_id or not isinstance(user_id, int) or user_id <= 0:
             raise ValueError("User ID must be a positive integer.")
         self._user_id = user_id
@@ -106,7 +106,7 @@ class Wallet:
             raise ValueError("Balance must be a non-negative number.")
         self._balance = float(new_balance)
 
-    def __init__(self, currency_code: str, initial_balance: int | float = 0.0):
+    def __init__(self, currency_code: str, initial_balance: int | float = 0.0) -> None:
         if (
             not currency_code
             or not isinstance(currency_code, str)
@@ -129,8 +129,58 @@ class Wallet:
             raise ValueError("Insufficient funds for withdrawal.")
         self.balance -= amount
 
-    def get_balance_info(self) -> dict:
+    def get_balance_info(self):
         return {
             "currency_code": self.currency_code,
             "balance": self.balance,
         }
+
+
+class Portfolio:
+    _user_id: int
+    _wallets: dict[str, Wallet]
+
+    def __init__(self, user_id: int, wallets: dict[str, Wallet]) -> None:
+        if not isinstance(user_id, int) or user_id <= 0:
+            raise ValueError("User ID must be a positive integer.")
+        self._user_id = user_id
+        self._wallets = {}
+        if wallets is not None or not isinstance(wallets, dict):
+            raise ValueError("Wallets must be provided as a dictionary.")
+
+        for code, wallet in wallets.items():
+            self._wallets[code] = wallet
+
+    @property
+    def user(self):
+        raise NotImplementedError("Property user is not implemented yet.")
+
+    @property
+    def user_id(self) -> int:
+        return self._user_id
+
+    @property
+    def wallets(self) -> dict[str, Wallet]:
+        return self._wallets.copy()
+
+    def add_currency(self, currency_code: str) -> None:
+        if not isinstance(currency_code, str) or not currency_code.strip():
+            raise ValueError("currency_code must be a non-empty string.")
+
+        code = currency_code.strip().upper()
+        if code in self._wallets:
+            raise ValueError(f"Currency '{code}' already exists in the portfolio.")
+
+        self._wallets[code] = Wallet(code)
+
+    def get_wallet(self, currency_code: str) -> Wallet:
+        if not isinstance(currency_code, str) or not currency_code.strip():
+            raise ValueError("currency_code must be a non-empty string.")
+        code = currency_code.strip().upper()
+        if code not in self._wallets:
+            raise ValueError(f"Currency '{code}' not found in the portfolio.")
+
+        return self._wallets[code]
+
+    def get_total_value(self, base_currency: str = "USD") -> float:
+        raise NotImplementedError("Method get_total_value is not implemented yet.")
