@@ -18,10 +18,22 @@ class User:
         salt: str,
         registration_date: datetime,
     ):
+        if not user_id or not isinstance(user_id, int) or user_id <= 0:
+            raise ValueError("User ID must be a positive integer.")
         self._user_id = user_id
-        self._username = username
+        self.username = username
+        if (
+            not hashed_password
+            or not isinstance(hashed_password, str)
+            or hashed_password.strip() == ""
+        ):
+            raise ValueError("Hashed password must be a non-empty string.")
         self._hashed_password = hashed_password
+        if not salt or not isinstance(salt, str) or salt.strip() == "":
+            raise ValueError("Salt must be a non-empty string.")
         self._salt = salt
+        if not isinstance(registration_date, datetime):
+            raise ValueError("Registration date must be a datetime object.")
         self._registration_date = registration_date
 
     @property
@@ -34,9 +46,13 @@ class User:
 
     @username.setter
     def username(self, new_username: str) -> None:
-        if not new_username:
-            raise ValueError("Username cannot be empty.")
-        self._username = new_username
+        if (
+            not new_username
+            or not isinstance(new_username, str)
+            or new_username.strip() == ""
+        ):
+            raise ValueError("Username must be a non-empty string.")
+        self._username = new_username.strip()
 
     @property
     def hashed_password(self) -> str:
@@ -52,13 +68,17 @@ class User:
 
     def get_user_info(self) -> dict:
         return {
-            "user_id": self._user_id,
-            "username": self._username,
-            "registration_date": self._registration_date.isoformat(),
+            "user_id": self.user_id,
+            "username": self.username,
+            "registration_date": self.registration_date.isoformat(),
         }
 
     def change_password(self, new_password: str) -> None:
-        if len(new_password) < 4:
+        if (
+            not new_password
+            or not isinstance(new_password, str)
+            or len(new_password) < 4
+        ):
             raise ValueError("Password must be at least 4 characters long.")
         self._salt = token_hex(16)
         self._hashed_password = sha256(
@@ -66,5 +86,7 @@ class User:
         ).hexdigest()
 
     def verify_password(self, password: str) -> bool:
+        if not password or not isinstance(password, str):
+            return False
         hashed_input = sha256((password + self._salt).encode("utf-8")).hexdigest()
         return hashed_input == self._hashed_password
