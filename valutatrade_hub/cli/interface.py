@@ -4,7 +4,49 @@ from shlex import split as shlex_split
 
 from prompt import string as prompt_string
 
-from valutatrade_hub.core.usecases import login, register, show_portfolio
+from valutatrade_hub.core.usecases import buy, login, register, show_portfolio
+
+
+def format_buy_result(data: dict) -> str:
+    lines = []
+    lines.append(
+        f"Покупка выполнена: {data['amount']:.4f} {data['currency']} "
+        f"по курсу {data['rate']:,.2f} {data['base_currency']}/{data['currency']}"
+    )
+    lines.append("Изменения в портфеле:")
+    lines.append(
+        f"- {data['currency']}: было {data['old_balance']:.4f} → "
+        f"стало {data['new_balance']:.4f}"
+    )
+    lines.append(
+        f"Оценочная стоимость покупки: {data['cost']:,.2f} {data['base_currency']}"
+    )
+    return "\n".join(lines)
+
+
+def format_portfolio_result(data: dict) -> str:
+    lines = [
+        f"Портфель пользователя '{data['username']}' (база: {data['base_currency']}):"
+    ]
+
+    if not data["wallets"]:
+        lines.append("Кошельков пока нет.")
+        lines.append("---------------------------------")
+        lines.append(f"ИТОГО: 0.00 {data['base_currency']}")
+        return "\n".join(lines)
+
+    for wallet in data["wallets"]:
+        amt_str = f"{wallet['amount']:.2f}"
+        val_str = f"{wallet['value_in_base']:,.2f}"
+        lines.append(
+            f"- {wallet['currency']}: {amt_str}\t→\t{val_str} {data['base_currency']}"
+        )
+
+    total_str = f"{data['total']:,.2f}"
+    lines.append("---------------------------------")
+    lines.append(f"ИТОГО: {total_str} {data['base_currency']}")
+
+    return "\n".join(lines)
 
 
 def handle_errors(func):
@@ -18,9 +60,17 @@ def handle_errors(func):
     return wrapper
 
 
+buy = handle_errors(buy)
 login = handle_errors(login)
 register = handle_errors(register)
 show_portfolio = handle_errors(show_portfolio)
+
+
+def check_login(login_id):
+    if login_id is None or not isinstance(login_id, int) or login_id <= 0:
+        print("Сначала выполните login.")
+        return False
+    return True
 
 
 class MyArgumentParser(ArgumentParser):
@@ -51,6 +101,11 @@ def build_parser() -> ArgumentParser:
         "-b", "--base", type=str, default="USD", required=False
     )
     p_show_portfolio.set_defaults(command="show-portfolio")
+
+    p_buy = sub.add_parser("buy", add_help=False)
+    p_buy.add_argument("-c", "--currency", type=str, required=True)
+    p_buy.add_argument("-a", "--amount", type=float, required=True)
+    p_buy.set_defaults(command="buy")
 
     return parser
 
@@ -89,12 +144,18 @@ def process_command(logged_id, parser, tokens):
                 return new_id, True
             return logged_id, True
         case "show-portfolio":
-            if logged_id is None:
-                print("Сначала выполните login.")
+            if not check_login(logged_id):
                 return logged_id, True
             data = show_portfolio(logged_id, ns.base)
             if data:
-                print(data)
+                print(format_portfolio_result(data))
+            return logged_id, True
+        case "buy":
+            if not check_login(logged_id):
+                return logged_id, True
+            result = buy(logged_id, ns.currency, ns.amount)
+            if result:
+                print(format_buy_result(result))
             return logged_id, True
         case _:
             return logged_id, True

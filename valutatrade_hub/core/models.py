@@ -264,11 +264,12 @@ class Portfolio:
 
         return self._wallets[code]
 
-    def get_rate(self, from_cur: str, to_cur: str) -> float:
+    @staticmethod
+    def get_rate(from_cur: str, to_cur: str) -> float:
         if from_cur == to_cur:
             return 1.0
         pair = f"{from_cur}_{to_cur}"
-        rec = self.EXCHANGE_RATES.get(pair)
+        rec = Portfolio.EXCHANGE_RATES.get(pair)
         if isinstance(rec, dict) and "rate" in rec:
             rate = rec["rate"]
             if not isinstance(rate, (int, float)) or rate <= 0:
@@ -277,7 +278,7 @@ class Portfolio:
                 )
             return float(rate)
         reverse_pair = f"{to_cur}_{from_cur}"
-        rec = self.EXCHANGE_RATES.get(reverse_pair)
+        rec = Portfolio.EXCHANGE_RATES.get(reverse_pair)
         if isinstance(rec, dict) and "rate" in rec:
             rate = rec["rate"]
             if not isinstance(rate, (int, float)) or rate <= 0:
@@ -302,7 +303,7 @@ class Portfolio:
             if amount == 0.0:
                 continue
 
-            rate = self.get_rate(cur, base)
+            rate = Portfolio.get_rate(cur, base)
             total_in_base += amount * rate
 
         return total_in_base
