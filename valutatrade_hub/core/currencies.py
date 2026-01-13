@@ -1,7 +1,7 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 
-class Currency:
+class Currency(ABC):
     _name: str
     _code: str
 
