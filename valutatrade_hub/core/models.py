@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 from secrets import token_hex
 
@@ -40,6 +40,58 @@ class User:
     def registration_date(self) -> datetime:
         return self._registration_date
 
+    @staticmethod
+    def to_dict(user: "User") -> dict:
+        return {
+            "user_id": user.user_id,
+            "username": user.username,
+            "hashed_password": user.hashed_password,
+            "salt": user.salt,
+            "registration_date": user.registration_date.isoformat(),
+        }
+
+    @staticmethod
+    def from_dict(data: dict) -> "User":
+        try:
+            return User(
+                user_id=int(data["user_id"]),
+                username=str(data["username"]),
+                hashed_password=str(data["hashed_password"]),
+                salt=str(data["salt"]),
+                registration_date=datetime.fromisoformat(
+                    str(data["registration_date"])
+                ),
+            )
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"Invalid user data: {e}")
+
+    @staticmethod
+    def create_hash(password: str, salt: str) -> str:
+        if not isinstance(password, str) or not isinstance(salt, str):
+            raise ValueError("Password and salt must be strings.")
+        return sha256((password + salt).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def hash_password(password: str) -> tuple[str, str]:
+        if not isinstance(password, str) or len(password) < 4:
+            raise ValueError("Password must be at least 4 characters long.")
+        salt = token_hex(16)
+        hashed = User.create_hash(password, salt)
+        return hashed, salt
+
+    @staticmethod
+    def from_plain_password(user_id: int, username: str, password: str) -> "User":
+        if not isinstance(password, str) or len(password) < 4:
+            raise ValueError("Password must be at least 4 characters long.")
+        hashed, salt = User.hash_password(password)
+        return User(
+            user_id=user_id,
+            username=username,
+            hashed_password=hashed,
+            salt=salt,
+            registration_date=datetime.now(timezone.utc),
+        )
+
     def __init__(
         self,
         user_id: int,
@@ -80,16 +132,12 @@ class User:
             or len(new_password) < 4
         ):
             raise ValueError("Password must be at least 4 characters long.")
-        self._salt = token_hex(16)
-        self._hashed_password = sha256(
-            (new_password + self._salt).encode("utf-8")
-        ).hexdigest()
+        self._hashed_password, self._salt = User.hash_password(new_password)
 
     def verify_password(self, password: str) -> bool:
         if not password or not isinstance(password, str):
             return False
-        hashed_input = sha256((password + self._salt).encode("utf-8")).hexdigest()
-        return hashed_input == self._hashed_password
+        return User.create_hash(password, self._salt) == self._hashed_password
 
 
 class Wallet:
