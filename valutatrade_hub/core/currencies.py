@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+from valutatrade_hub.core.exceptions import CurrencyNotFoundError
+
 
 class Currency(ABC):
     _name: str
@@ -94,3 +96,28 @@ class CryptoCurrency(Currency):
             f"[CRYPTO] {self.code} - {self.name}"
             f" (Algo: {self.algorithm}, MCAP: {self.market_cap})"
         )
+
+
+_CURRENCY_REGISTRY: dict[str, Currency] = {
+    "USD": FiatCurrency("US Dollar", "USD", "United States"),
+    "EUR": FiatCurrency("Euro", "EUR", "Eurozone"),
+    "RUB": FiatCurrency("Russian Ruble", "RUB", "Russia"),
+    "BTC": CryptoCurrency("Bitcoin", "BTC", "SHA-256", 1.0e10),
+    "ETH": CryptoCurrency("Ethereum", "ETH", "Ethash", 1.0e5),
+}
+
+
+def get_currency(code: str) -> Currency:
+    if not code or not isinstance(code, str):
+        raise CurrencyNotFoundError(code if code else "")
+    normalized_code = code.strip().upper()
+    if not normalized_code:
+        raise CurrencyNotFoundError(code)
+    currency = _CURRENCY_REGISTRY.get(normalized_code)
+    if currency is None:
+        raise CurrencyNotFoundError(normalized_code)
+    return currency
+
+
+def get_supported_currencies() -> list[str]:
+    return sorted(_CURRENCY_REGISTRY.keys())
