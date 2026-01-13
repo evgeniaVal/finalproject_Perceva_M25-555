@@ -4,24 +4,7 @@ from shlex import split as shlex_split
 
 from prompt import string as prompt_string
 
-from valutatrade_hub.core.usecases import buy, login, register, show_portfolio
-
-
-def format_buy_result(data: dict) -> str:
-    lines = []
-    lines.append(
-        f"Покупка выполнена: {data['amount']:.4f} {data['currency']} "
-        f"по курсу {data['rate']:,.2f} {data['base_currency']}/{data['currency']}"
-    )
-    lines.append("Изменения в портфеле:")
-    lines.append(
-        f"- {data['currency']}: было {data['old_balance']:.4f} → "
-        f"стало {data['new_balance']:.4f}"
-    )
-    lines.append(
-        f"Оценочная стоимость покупки: {data['cost']:,.2f} {data['base_currency']}"
-    )
-    return "\n".join(lines)
+from valutatrade_hub.core.usecases import buy, login, register, sell, show_portfolio
 
 
 def format_portfolio_result(data: dict) -> str:
@@ -46,6 +29,38 @@ def format_portfolio_result(data: dict) -> str:
     lines.append("---------------------------------")
     lines.append(f"ИТОГО: {total_str} {data['base_currency']}")
 
+    return "\n".join(lines)
+
+
+def format_buy_result(data: dict) -> str:
+    lines = []
+    lines.append(
+        f"Покупка выполнена: {data['amount']:.4f} {data['currency']} "
+        f"по курсу {data['rate']:,.2f} {data['base_currency']}/{data['currency']}"
+    )
+    lines.append("Изменения в портфеле:")
+    lines.append(
+        f"- {data['currency']}: было {data['old_balance']:.4f} → "
+        f"стало {data['new_balance']:.4f}"
+    )
+    lines.append(
+        f"Оценочная стоимость покупки: {data['cost']:,.2f} {data['base_currency']}"
+    )
+    return "\n".join(lines)
+
+
+def format_sell_result(data: dict) -> str:
+    lines = []
+    lines.append(
+        f"Продажа выполнена: {data['amount']:.4f} {data['currency']} "
+        f"по курсу {data['rate']:,.2f} {data['base_currency']}/{data['currency']}"
+    )
+    lines.append("Изменения в портфеле:")
+    lines.append(
+        f"- {data['currency']}: было {data['old_balance']:.4f} → "
+        f"стало {data['new_balance']:.4f}"
+    )
+    lines.append(f"Оценочная выручка: {data['cost']:,.2f} {data['base_currency']}")
     return "\n".join(lines)
 
 
@@ -107,6 +122,11 @@ def build_parser() -> ArgumentParser:
     p_buy.add_argument("-a", "--amount", type=float, required=True)
     p_buy.set_defaults(command="buy")
 
+    p_sell = sub.add_parser("sell", add_help=False)
+    p_sell.add_argument("-c", "--currency", type=str, required=True)
+    p_sell.add_argument("-a", "--amount", type=float, required=True)
+    p_sell.set_defaults(command="sell")
+
     return parser
 
 
@@ -156,6 +176,13 @@ def process_command(logged_id, parser, tokens):
             result = buy(logged_id, ns.currency, ns.amount)
             if result:
                 print(format_buy_result(result))
+            return logged_id, True
+        case "sell":
+            if not check_login(logged_id):
+                return logged_id, True
+            result = sell(logged_id, ns.currency, ns.amount)
+            if result:
+                print(format_sell_result(result))
             return logged_id, True
         case _:
             return logged_id, True
