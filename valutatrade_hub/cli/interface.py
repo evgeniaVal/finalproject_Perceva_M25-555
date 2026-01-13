@@ -79,6 +79,7 @@ buy = handle_errors(buy)
 login = handle_errors(login)
 register = handle_errors(register)
 show_portfolio = handle_errors(show_portfolio)
+sell = handle_errors(sell)
 
 
 def check_login(login_id):
