@@ -149,10 +149,19 @@ def sell(user_id: int, currency: str, amount: float):
     portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
 
     if currency_code not in portfolio.wallets:
-        raise ValueError(f"Валюта '{currency_code}' отсутствует в портфеле.")
+        raise ValueError(
+            f"У вас нет кошелька {currency_code}. Добавьте валюту."
+            " Она создаётся автоматически при первой покупке."
+        )
     wallet = portfolio.get_wallet(currency_code)
     old_balance = wallet.balance
-    wallet.withdraw(amount)
+    try:
+        wallet.withdraw(amount)
+    except ValueError:
+        raise ValueError(
+            f"Недостаточно средств: доступно {wallet.balance} {currency_code},"
+            f" требуется {amount} {currency_code}"
+        )
     new_balance = wallet.balance
 
     rate = _get_rate(currency_code, base_cur)
