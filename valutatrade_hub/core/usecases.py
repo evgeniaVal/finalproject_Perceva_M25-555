@@ -1,8 +1,10 @@
+from .currencies import get_currency
 from .models import Portfolio, User
 from .utils import load_json, save_json
 
 USERS_LOC = "data/users.json"
 PORTFOLIOS_LOC = "data/portfolios.json"
+BASE_CURRENCY = "USD"
 
 
 def _get_user(user_id: int) -> dict:
@@ -20,24 +22,6 @@ def _get_portfolio(user_id: int):
         if int(p.get("user_id", -1)) == int(user_id):
             return Portfolio.from_dict(p), idx, portfolios
     raise ValueError(f"Портфель пользователя с id={user_id} не найден.")
-
-
-def _validate_currency(currency: str) -> str:
-    if not isinstance(currency, str) or not currency.strip():
-        raise ValueError("currency должен быть непустой строкой.")
-    return currency.strip().upper()
-
-
-def _validate_amount(amount: float):
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        raise ValueError("'amount' должен быть положительным числом.")
-
-
-def _get_rate(currency_code: str, base_cur: str) -> float:
-    try:
-        return Portfolio.get_rate(currency_code, base_cur)
-    except ValueError:
-        raise ValueError(f"Не удалось получить курс для {currency_code}→{base_cur}")
 
 
 def register(username: str, password: str):
@@ -70,12 +54,10 @@ def login(username: str, password: str) -> int:
 
 
 def show_portfolio(user_id: int, base: str):
-    if not isinstance(base, str) or not base.strip():
-        raise ValueError("base_currency must be a non-empty string.")
-    base_cur = base.strip().upper()
     user = _get_user(user_id)
     username = user.get("username", "")
     portfolio, _, _ = _get_portfolio(user_id)
+    base_cur = base.strip().upper() if isinstance(base, str) else "USD"
     wallets_info = []
     total = 0.0
     for code in portfolio.wallets.keys():
@@ -107,11 +89,8 @@ def show_portfolio(user_id: int, base: str):
 
 
 def buy(user_id: int, currency: str, amount: float):
-    base_cur = "USD"
-
     _get_user(user_id)
-    currency_code = _validate_currency(currency)
-    _validate_amount(amount)
+    currency_code = get_currency(currency).code
 
     portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
 
@@ -122,7 +101,7 @@ def buy(user_id: int, currency: str, amount: float):
     wallet.deposit(amount)
     new_balance = wallet.balance
 
-    rate = _get_rate(currency_code, base_cur)
+    rate = Portfolio.get_rate(currency_code, BASE_CURRENCY)
     cost = amount * rate
 
     portfolios[portfolio_index] = Portfolio.to_dict(portfolio)
@@ -132,7 +111,7 @@ def buy(user_id: int, currency: str, amount: float):
         "currency": currency_code,
         "amount": amount,
         "rate": rate,
-        "base_currency": base_cur,
+        "base_currency": BASE_CURRENCY,
         "old_balance": old_balance,
         "new_balance": new_balance,
         "cost": cost,
@@ -140,11 +119,8 @@ def buy(user_id: int, currency: str, amount: float):
 
 
 def sell(user_id: int, currency: str, amount: float):
-    base_cur = "USD"
-
     _get_user(user_id)
-    currency_code = _validate_currency(currency)
-    _validate_amount(amount)
+    currency_code = get_currency(currency).code
 
     portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
 
@@ -155,16 +131,10 @@ def sell(user_id: int, currency: str, amount: float):
         )
     wallet = portfolio.get_wallet(currency_code)
     old_balance = wallet.balance
-    try:
-        wallet.withdraw(amount)
-    except ValueError:
-        raise ValueError(
-            f"Недостаточно средств: доступно {wallet.balance} {currency_code},"
-            f" требуется {amount} {currency_code}"
-        )
+    wallet.withdraw(amount)
     new_balance = wallet.balance
 
-    rate = _get_rate(currency_code, base_cur)
+    rate = Portfolio.get_rate(currency_code, BASE_CURRENCY)
     cost = amount * rate
 
     portfolios[portfolio_index] = Portfolio.to_dict(portfolio)
@@ -174,7 +144,7 @@ def sell(user_id: int, currency: str, amount: float):
         "currency": currency_code,
         "amount": amount,
         "rate": rate,
-        "base_currency": base_cur,
+        "base_currency": BASE_CURRENCY,
         "old_balance": old_balance,
         "new_balance": new_balance,
         "cost": cost,
@@ -182,13 +152,10 @@ def sell(user_id: int, currency: str, amount: float):
 
 
 def get_rate(from_cur: str, to_cur: str) -> dict:
-    if not isinstance(from_cur, str) or not from_cur.strip():
-        raise ValueError("from_cur должен быть непустой строкой.")
-    if not isinstance(to_cur, str) or not to_cur.strip():
-        raise ValueError("to_cur должен быть непустой строкой.")
-
-    from_code = from_cur.strip().upper()
-    to_code = to_cur.strip().upper()
+    from_currency_obj = get_currency(from_cur)
+    to_currency_obj = get_currency(to_cur)
+    from_code = from_currency_obj.code
+    to_code = to_currency_obj.code
 
     rate = Portfolio.get_rate(from_code, to_code)
     reverse_rate = 1.0 / rate if rate != 0 else 0.0

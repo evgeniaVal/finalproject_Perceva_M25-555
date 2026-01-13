@@ -2,6 +2,9 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from secrets import token_hex
 
+from valutatrade_hub.core.currencies import get_currency
+from valutatrade_hub.core.exceptions import InsufficientFundsError
+
 
 class User:
     _user_id: int  # уникальный идентификатор пользователя
@@ -20,11 +23,7 @@ class User:
 
     @username.setter
     def username(self, new_username: str) -> None:
-        if (
-            not new_username
-            or not isinstance(new_username, str)
-            or new_username.strip() == ""
-        ):
+        if not isinstance(new_username, str) or not new_username.strip():
             raise ValueError("Username must be a non-empty string.")
         self._username = new_username.strip()
 
@@ -85,7 +84,6 @@ class User:
 
     @staticmethod
     def from_plain_password(user_id: int, username: str, password: str) -> "User":
-        User._verify_password_format(password)
         hashed, salt = User._hash_password(password)
         return User(
             user_id=user_id,
@@ -103,18 +101,14 @@ class User:
         salt: str,
         registration_date: datetime,
     ) -> None:
-        if not user_id or not isinstance(user_id, int) or user_id <= 0:
+        if not isinstance(user_id, int) or user_id <= 0:
             raise ValueError("User ID must be a positive integer.")
         self._user_id = user_id
         self.username = username
-        if (
-            not hashed_password
-            or not isinstance(hashed_password, str)
-            or hashed_password.strip() == ""
-        ):
+        if not isinstance(hashed_password, str) or not hashed_password.strip():
             raise ValueError("Hashed password must be a non-empty string.")
         self._hashed_password = hashed_password
-        if not salt or not isinstance(salt, str) or salt.strip() == "":
+        if not isinstance(salt, str) or not salt.strip():
             raise ValueError("Salt must be a non-empty string.")
         self._salt = salt
         if not isinstance(registration_date, datetime):
@@ -133,7 +127,7 @@ class User:
         self._hashed_password, self._salt = User._hash_password(new_password)
 
     def verify_password(self, password: str) -> bool:
-        if not password or not isinstance(password, str):
+        if not isinstance(password, str) or not password:
             return False
         return User._create_hash(password, self._salt) == self._hashed_password
 
@@ -154,9 +148,8 @@ class Wallet:
 
     def __init__(self, currency_code: str, initial_balance: int | float = 0.0) -> None:
         if (
-            not currency_code
-            or not isinstance(currency_code, str)
-            or currency_code.strip() == ""
+            not isinstance(currency_code, str)
+            or not currency_code.strip()
             or not currency_code.strip().isupper()
         ):
             raise ValueError("Currency code must be a non-empty uppercase string.")
@@ -172,7 +165,11 @@ class Wallet:
         if not isinstance(amount, (int, float)) or amount <= 0:
             raise ValueError("Withdrawal amount must be positive.")
         if amount > self.balance:
-            raise ValueError("Insufficient funds for withdrawal.")
+            raise InsufficientFundsError(
+                available=self.balance,
+                required=amount,
+                currency_code=self.currency_code,
+            )
         self.balance -= amount
 
     def get_balance_info(self):
@@ -246,19 +243,18 @@ class Portfolio:
             raise ValueError(f"Invalid portfolio data: {e}")
 
     def add_currency(self, currency_code: str) -> None:
-        if not isinstance(currency_code, str) or not currency_code.strip():
-            raise ValueError("currency_code must be a non-empty string.")
+        currency = get_currency(currency_code)
+        code = currency.code
 
-        code = currency_code.strip().upper()
         if code in self._wallets:
             raise ValueError(f"Currency '{code}' already exists in the portfolio.")
 
         self._wallets[code] = Wallet(code)
 
     def get_wallet(self, currency_code: str) -> Wallet:
-        if not isinstance(currency_code, str) or not currency_code.strip():
-            raise ValueError("currency_code must be a non-empty string.")
-        code = currency_code.strip().upper()
+        currency = get_currency(currency_code)
+        code = currency.code
+
         if code not in self._wallets:
             raise ValueError(f"Currency '{code}' not found in the portfolio.")
 

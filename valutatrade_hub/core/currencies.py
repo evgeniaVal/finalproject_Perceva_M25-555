@@ -108,11 +108,9 @@ _CURRENCY_REGISTRY: dict[str, Currency] = {
 
 
 def get_currency(code: str) -> Currency:
-    if not code or not isinstance(code, str):
+    if not isinstance(code, str) or not code.strip():
         raise CurrencyNotFoundError(code if code else "")
     normalized_code = code.strip().upper()
-    if not normalized_code:
-        raise CurrencyNotFoundError(code)
     currency = _CURRENCY_REGISTRY.get(normalized_code)
     if currency is None:
         raise CurrencyNotFoundError(normalized_code)
