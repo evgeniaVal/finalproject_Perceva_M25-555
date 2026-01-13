@@ -66,24 +66,27 @@ class User:
             raise ValueError(f"Invalid user data: {e}")
 
     @staticmethod
-    def create_hash(password: str, salt: str) -> str:
+    def _verify_password_format(password: str) -> None:
+        if not isinstance(password, str) or len(password) < 4:
+            raise ValueError("Пароль должен быть не короче 4 символов.")
+
+    @staticmethod
+    def _create_hash(password: str, salt: str) -> str:
         if not isinstance(password, str) or not isinstance(salt, str):
             raise ValueError("Password and salt must be strings.")
         return sha256((password + salt).encode("utf-8")).hexdigest()
 
     @staticmethod
-    def hash_password(password: str) -> tuple[str, str]:
-        if not isinstance(password, str) or len(password) < 4:
-            raise ValueError("Password must be at least 4 characters long.")
+    def _hash_password(password: str) -> tuple[str, str]:
+        User._verify_password_format(password)
         salt = token_hex(16)
-        hashed = User.create_hash(password, salt)
+        hashed = User._create_hash(password, salt)
         return hashed, salt
 
     @staticmethod
     def from_plain_password(user_id: int, username: str, password: str) -> "User":
-        if not isinstance(password, str) or len(password) < 4:
-            raise ValueError("Password must be at least 4 characters long.")
-        hashed, salt = User.hash_password(password)
+        User._verify_password_format(password)
+        hashed, salt = User._hash_password(password)
         return User(
             user_id=user_id,
             username=username,
@@ -126,18 +129,13 @@ class User:
         }
 
     def change_password(self, new_password: str) -> None:
-        if (
-            not new_password
-            or not isinstance(new_password, str)
-            or len(new_password) < 4
-        ):
-            raise ValueError("Password must be at least 4 characters long.")
-        self._hashed_password, self._salt = User.hash_password(new_password)
+        User._verify_password_format(new_password)
+        self._hashed_password, self._salt = User._hash_password(new_password)
 
     def verify_password(self, password: str) -> bool:
         if not password or not isinstance(password, str):
             return False
-        return User.create_hash(password, self._salt) == self._hashed_password
+        return User._create_hash(password, self._salt) == self._hashed_password
 
 
 class Wallet:

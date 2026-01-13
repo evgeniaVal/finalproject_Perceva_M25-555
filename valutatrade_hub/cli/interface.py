@@ -3,6 +3,8 @@ from shlex import split as shlex_split
 
 from prompt import string as prompt_string
 
+from valutatrade_hub.core.usecases import register
+
 
 class MyArgumentParser(ArgumentParser):
     def error(self, message: str):
@@ -44,7 +46,14 @@ def process_command(parser, tokens):
             print("До свидания!")
             return False
         case "register":
-            print("Parsed args:", ns)
+            try:
+                idx = register(ns.username, ns.password)
+                print(
+                    f"Пользователь '{ns.username}' успешно зарегистрирован (id={idx})."
+                    f" Войдите: login --username {ns.username} --password ****"
+                )
+            except ValueError as e:
+                print(e)
             return True
         case _:
             print(f"Неизвестная команда: {ns.command}")
