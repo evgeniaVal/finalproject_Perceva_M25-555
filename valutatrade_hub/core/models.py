@@ -200,7 +200,9 @@ class Portfolio:
             raise ValueError("User ID must be a positive integer.")
         self._user_id = user_id
         self._wallets = {}
-        if wallets is not None or not isinstance(wallets, dict):
+        if wallets is None:
+            wallets = {}
+        if not isinstance(wallets, dict):
             raise ValueError("Wallets must be provided as a dictionary.")
 
         for code, wallet in wallets.items():
@@ -217,6 +219,16 @@ class Portfolio:
     @property
     def wallets(self) -> dict[str, Wallet]:
         return self._wallets.copy()
+
+    @staticmethod
+    def to_dict(portfolio: "Portfolio") -> dict:
+        return {
+            "user_id": portfolio.user_id,
+            "wallets": {
+                code: wallet.get_balance_info()
+                for code, wallet in portfolio.wallets.items()
+            },
+        }
 
     def add_currency(self, currency_code: str) -> None:
         if not isinstance(currency_code, str) or not currency_code.strip():

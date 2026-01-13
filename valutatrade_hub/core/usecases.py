@@ -1,7 +1,8 @@
-from .models import User
+from .models import Portfolio, User
 from .utils import load_json, save_json
 
 USERS_LOC = "data/users.json"
+PORTFOLIOS_LOC = "data/portfolios.json"
 
 
 def register(username: str, password: str):
@@ -13,4 +14,8 @@ def register(username: str, password: str):
     new_user = User.from_plain_password(new_id, uname, password)
     users.append(User.to_dict(new_user))
     save_json(USERS_LOC, users)
+    new_portfolio = Portfolio(new_id, {})
+    portfolios = load_json(PORTFOLIOS_LOC, default=list)
+    portfolios.append(Portfolio.to_dict(new_portfolio))
+    save_json(PORTFOLIOS_LOC, portfolios)
     return new_id
