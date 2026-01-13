@@ -4,7 +4,7 @@ from shlex import split as shlex_split
 
 from prompt import string as prompt_string
 
-from valutatrade_hub.core.usecases import login, register
+from valutatrade_hub.core.usecases import login, register, show_portfolio
 
 
 def handle_errors(func):
@@ -20,6 +20,7 @@ def handle_errors(func):
 
 login = handle_errors(login)
 register = handle_errors(register)
+show_portfolio = handle_errors(show_portfolio)
 
 
 class MyArgumentParser(ArgumentParser):
@@ -44,6 +45,12 @@ def build_parser() -> ArgumentParser:
     p_login.add_argument("-u", "--username", type=str, required=True)
     p_login.add_argument("-p", "--password", type=str, required=True)
     p_login.set_defaults(command="login")
+
+    p_show_portfolio = sub.add_parser("show-portfolio", add_help=False)
+    p_show_portfolio.add_argument(
+        "-b", "--base", type=str, default="USD", required=False
+    )
+    p_show_portfolio.set_defaults(command="show-portfolio")
 
     return parser
 
@@ -80,6 +87,14 @@ def process_command(logged_id, parser, tokens):
             if new_id:
                 print(f"Вы вошли как '{ns.username}'.")
                 return new_id, True
+            return logged_id, True
+        case "show-portfolio":
+            if logged_id is None:
+                print("Сначала выполните login.")
+                return logged_id, True
+            data = show_portfolio(logged_id, ns.base)
+            if data:
+                print(data)
             return logged_id, True
         case _:
             return logged_id, True

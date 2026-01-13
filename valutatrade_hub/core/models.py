@@ -230,6 +230,21 @@ class Portfolio:
             },
         }
 
+    @staticmethod
+    def from_dict(data: dict) -> "Portfolio":
+        try:
+            wallets_data = data.get("wallets", {})
+            wallets = {
+                code: Wallet(currency_code=code, initial_balance=float(info["balance"]))
+                for code, info in wallets_data.items()
+            }
+            return Portfolio(
+                user_id=int(data["user_id"]),
+                wallets=wallets,
+            )
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"Invalid portfolio data: {e}")
+
     def add_currency(self, currency_code: str) -> None:
         if not isinstance(currency_code, str) or not currency_code.strip():
             raise ValueError("currency_code must be a non-empty string.")
@@ -249,7 +264,7 @@ class Portfolio:
 
         return self._wallets[code]
 
-    def _get_rate(self, from_cur: str, to_cur: str) -> float:
+    def get_rate(self, from_cur: str, to_cur: str) -> float:
         if from_cur == to_cur:
             return 1.0
         pair = f"{from_cur}_{to_cur}"
@@ -287,7 +302,7 @@ class Portfolio:
             if amount == 0.0:
                 continue
 
-            rate = self._get_rate(cur, base)
+            rate = self.get_rate(cur, base)
             total_in_base += amount * rate
 
         return total_in_base
