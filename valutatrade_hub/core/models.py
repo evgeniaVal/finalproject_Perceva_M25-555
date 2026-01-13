@@ -186,6 +186,15 @@ class Portfolio:
     _user_id: int
     _wallets: dict[str, Wallet]
 
+    EXCHANGE_RATES = {  # TODO(): загрузка из внешнего источника
+        "EUR_USD": {"rate": 1.0786, "updated_at": "2025-10-09T10:30:00+00:00"},
+        "BTC_USD": {"rate": 59337.21, "updated_at": "2025-10-09T10:29:42+00:00"},
+        "RUB_USD": {"rate": 0.01016, "updated_at": "2025-10-09T10:31:12+00:00"},
+        "ETH_USD": {"rate": 3720.00, "updated_at": "2025-10-09T10:35:00+00:00"},
+        "source": {"value": "ParserService"},
+        "last_refresh": {"value": "2025-10-09T10:35:00+00:00"},
+    }
+
     def __init__(self, user_id: int, wallets: dict[str, Wallet]) -> None:
         if not isinstance(user_id, int) or user_id <= 0:
             raise ValueError("User ID must be a positive integer.")
@@ -228,5 +237,45 @@ class Portfolio:
 
         return self._wallets[code]
 
+    def _get_rate(self, from_cur: str, to_cur: str) -> float:
+        if from_cur == to_cur:
+            return 1.0
+        pair = f"{from_cur}_{to_cur}"
+        rec = self.EXCHANGE_RATES.get(pair)
+        if isinstance(rec, dict) and "rate" in rec:
+            rate = rec["rate"]
+            if not isinstance(rate, (int, float)) or rate <= 0:
+                raise ValueError(
+                    f"Invalid exchange rate for pair '{from_cur}' to '{to_cur}': {rate}"
+                )
+            return float(rate)
+        reverse_pair = f"{to_cur}_{from_cur}"
+        rec = self.EXCHANGE_RATES.get(reverse_pair)
+        if isinstance(rec, dict) and "rate" in rec:
+            rate = rec["rate"]
+            if not isinstance(rate, (int, float)) or rate <= 0:
+                raise ValueError(
+                    f"Invalid exchange rate for pair '{to_cur}' to '{from_cur}': {rate}"
+                )
+            return 1.0 / float(rate)
+        raise ValueError(
+            f"Exchange rate for pair '{from_cur}' to '{to_cur}' not found."
+        )
+
     def get_total_value(self, base_currency: str = "USD") -> float:
-        raise NotImplementedError("Method get_total_value is not implemented yet.")
+        if not isinstance(base_currency, str) or not base_currency.strip():
+            raise ValueError("base_currency must be a non-empty string.")
+        base = base_currency.strip().upper()
+
+        total_in_base = 0.0
+        for code, wallet in self._wallets.items():
+            cur = code.upper()
+            amount = float(wallet.balance)
+
+            if amount == 0.0:
+                continue
+
+            rate = self._get_rate(cur, base)
+            total_in_base += amount * rate
+
+        return total_in_base
