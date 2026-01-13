@@ -225,7 +225,7 @@ class Portfolio:
         return {
             "user_id": portfolio.user_id,
             "wallets": {
-                code: wallet.get_balance_info()
+                code: {"balance": wallet.balance}
                 for code, wallet in portfolio.wallets.items()
             },
         }

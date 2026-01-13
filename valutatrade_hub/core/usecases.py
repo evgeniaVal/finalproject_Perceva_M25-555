@@ -19,3 +19,16 @@ def register(username: str, password: str):
     portfolios.append(Portfolio.to_dict(new_portfolio))
     save_json(PORTFOLIOS_LOC, portfolios)
     return new_id
+
+
+def login(username: str, password: str) -> int:
+    uname = username.strip()
+    users = load_json(USERS_LOC, default=list)
+    for u in users:
+        if u["username"] == uname:
+            user = User.from_dict(u)
+            if user.verify_password(password):
+                return user.user_id
+            else:
+                raise ValueError("Неверный пароль.")
+    raise ValueError(f"Пользователь '{uname}' не найден.")
