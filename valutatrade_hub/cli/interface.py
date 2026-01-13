@@ -1,10 +1,18 @@
 from argparse import ArgumentParser
+from datetime import datetime
 from functools import wraps
 from shlex import split as shlex_split
 
 from prompt import string as prompt_string
 
-from valutatrade_hub.core.usecases import buy, login, register, sell, show_portfolio
+from valutatrade_hub.core.usecases import (
+    buy,
+    get_rate,
+    login,
+    register,
+    sell,
+    show_portfolio,
+)
 
 
 def format_portfolio_result(data: dict) -> str:
@@ -64,6 +72,27 @@ def format_sell_result(data: dict) -> str:
     return "\n".join(lines)
 
 
+def format_rate_result(data: dict) -> str:
+    from_cur = data["from_currency"]
+    to_cur = data["to_currency"]
+    rate_str = str(data["rate"])
+    reverse_rate_str = str(data["reverse_rate"])
+    updated_at = data.get("updated_at")
+
+    lines = []
+
+    if updated_at:
+        dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+        time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+        lines.append(f"Курс {from_cur}→{to_cur}: {rate_str} (обновлено: {time_str})")
+    else:
+        lines.append(f"Курс {from_cur}→{to_cur}: {rate_str}")
+
+    lines.append(f"Обратный курс {to_cur}→{from_cur}: {reverse_rate_str}")
+
+    return "\n".join(lines)
+
+
 def handle_errors(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -80,6 +109,7 @@ login = handle_errors(login)
 register = handle_errors(register)
 show_portfolio = handle_errors(show_portfolio)
 sell = handle_errors(sell)
+get_rate = handle_errors(get_rate)
 
 
 def check_login(login_id):
@@ -127,6 +157,11 @@ def build_parser() -> ArgumentParser:
     p_sell.add_argument("-c", "--currency", type=str, required=True)
     p_sell.add_argument("-a", "--amount", type=float, required=True)
     p_sell.set_defaults(command="sell")
+
+    p_get_rate = sub.add_parser("get-rate", add_help=False)
+    p_get_rate.add_argument("-f", "--from", dest="from_cur", type=str, required=True)
+    p_get_rate.add_argument("-t", "--to", dest="to_cur", type=str, required=True)
+    p_get_rate.set_defaults(command="get-rate")
 
     return parser
 
@@ -184,6 +219,11 @@ def process_command(logged_id, parser, tokens):
             result = sell(logged_id, ns.currency, ns.amount)
             if result:
                 print(format_sell_result(result))
+            return logged_id, True
+        case "get-rate":
+            result = get_rate(ns.from_cur, ns.to_cur)
+            if result:
+                print(format_rate_result(result))
             return logged_id, True
         case _:
             return logged_id, True

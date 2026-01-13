@@ -179,3 +179,32 @@ def sell(user_id: int, currency: str, amount: float):
         "new_balance": new_balance,
         "cost": cost,
     }
+
+
+def get_rate(from_cur: str, to_cur: str) -> dict:
+    if not isinstance(from_cur, str) or not from_cur.strip():
+        raise ValueError("from_cur должен быть непустой строкой.")
+    if not isinstance(to_cur, str) or not to_cur.strip():
+        raise ValueError("to_cur должен быть непустой строкой.")
+
+    from_code = from_cur.strip().upper()
+    to_code = to_cur.strip().upper()
+
+    rate = Portfolio.get_rate(from_code, to_code)
+    reverse_rate = 1.0 / rate if rate != 0 else 0.0
+
+    pair = f"{from_code}_{to_code}"
+    reverse_pair = f"{to_code}_{from_code}"
+
+    rec = Portfolio.EXCHANGE_RATES.get(pair) or Portfolio.EXCHANGE_RATES.get(
+        reverse_pair
+    )
+    updated_at = rec.get("updated_at") if isinstance(rec, dict) else None
+
+    return {
+        "from_currency": from_code,
+        "to_currency": to_code,
+        "rate": rate,
+        "reverse_rate": reverse_rate,
+        "updated_at": updated_at,
+    }
