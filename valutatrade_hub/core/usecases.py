@@ -5,6 +5,41 @@ USERS_LOC = "data/users.json"
 PORTFOLIOS_LOC = "data/portfolios.json"
 
 
+def _get_user(user_id: int) -> dict:
+    """Возвращает пользователя по id."""
+    users = load_json(USERS_LOC, default=list)
+    for u in users:
+        if int(u.get("user_id", -1)) == int(user_id):
+            return u
+    raise ValueError(f"Пользователь с id={user_id} не найден.")
+
+
+def _get_portfolio(user_id: int):
+    portfolios = load_json(PORTFOLIOS_LOC, default=list)
+    for idx, p in enumerate(portfolios):
+        if int(p.get("user_id", -1)) == int(user_id):
+            return Portfolio.from_dict(p), idx, portfolios
+    raise ValueError(f"Портфель пользователя с id={user_id} не найден.")
+
+
+def _validate_currency(currency: str) -> str:
+    if not isinstance(currency, str) or not currency.strip():
+        raise ValueError("currency должен быть непустой строкой.")
+    return currency.strip().upper()
+
+
+def _validate_amount(amount: float):
+    if not isinstance(amount, (int, float)) or amount <= 0:
+        raise ValueError("'amount' должен быть положительным числом.")
+
+
+def _get_rate(currency_code: str, base_cur: str) -> float:
+    try:
+        return Portfolio.get_rate(currency_code, base_cur)
+    except ValueError:
+        raise ValueError(f"Не удалось получить курс для {currency_code}→{base_cur}")
+
+
 def register(username: str, password: str):
     uname = username.strip()
     users = load_json(USERS_LOC, default=list)
@@ -38,23 +73,9 @@ def show_portfolio(user_id: int, base: str):
     if not isinstance(base, str) or not base.strip():
         raise ValueError("base_currency must be a non-empty string.")
     base_cur = base.strip().upper()
-    users = load_json(USERS_LOC, default=list)
-    username = None
-    for u in users:
-        if int(u.get("user_id", -1)) == int(user_id):
-            username = str(u.get("username", ""))
-            break
-    if not username:
-        raise ValueError(f"Пользователь с id={user_id} не найден.")
-    portfolios = load_json(PORTFOLIOS_LOC, default=list)
-    found = None
-    for p in portfolios:
-        if int(p.get("user_id", -1)) == int(user_id):
-            found = p
-            break
-    if found is None:
-        raise ValueError(f"Портфель пользователя с id={user_id} не найден.")
-    portfolio = Portfolio.from_dict(found)
+    user = _get_user(user_id)
+    username = user.get("username", "")
+    portfolio, _, _ = _get_portfolio(user_id)
     wallets_info = []
     total = 0.0
     for code in portfolio.wallets.keys():
@@ -68,12 +89,14 @@ def show_portfolio(user_id: int, base: str):
         value_in_base = amount * rate
         total += value_in_base
 
-        wallets_info.append({
-            "currency": code,
-            "amount": amount,
-            "rate": rate,
-            "value_in_base": value_in_base,
-        })
+        wallets_info.append(
+            {
+                "currency": code,
+                "amount": amount,
+                "rate": rate,
+                "value_in_base": value_in_base,
+            }
+        )
 
     return {
         "username": username,
@@ -84,46 +107,57 @@ def show_portfolio(user_id: int, base: str):
 
 
 def buy(user_id: int, currency: str, amount: float):
-    users = load_json(USERS_LOC, default=list)
-    user_found = False
-    for u in users:
-        if int(u.get("user_id", -1)) == int(user_id):
-            user_found = True
-            break
-    if not user_found:
-        raise ValueError(f"Пользователь с id={user_id} не найден.")
-    if not isinstance(currency, str) or not currency.strip():
-        raise ValueError("currency должен быть непустой строкой.")
-    currency_code = currency.strip().upper()
-    if not isinstance(amount, (int, float)) or amount <= 0:
-        raise ValueError("'amount' должен быть положительным числом.")
     base_cur = "USD"
-    portfolios = load_json(PORTFOLIOS_LOC, default=list)
-    portfolio_data = None
-    portfolio_index = None
-    for idx, p in enumerate(portfolios):
-        if int(p.get("user_id", -1)) == int(user_id):
-            portfolio_data = p
-            portfolio_index = idx
-            break
-    if portfolio_data is None:
-        raise ValueError(f"Портфель пользователя с id={user_id} не найден.")
-    portfolio = Portfolio.from_dict(portfolio_data)
+
+    _get_user(user_id)
+    currency_code = _validate_currency(currency)
+    _validate_amount(amount)
+
+    portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
+
     if currency_code not in portfolio.wallets:
         portfolio.add_currency(currency_code)
     wallet = portfolio.get_wallet(currency_code)
-    old_balance = portfolio.get_wallet(currency_code).balance
+    old_balance = wallet.balance
     wallet.deposit(amount)
     new_balance = wallet.balance
-    try:
-        rate = Portfolio.get_rate(currency_code, base_cur)
-    except ValueError:
-        raise ValueError(f"Не удалось получить курс для {currency_code}→{base_cur}")
 
+    rate = _get_rate(currency_code, base_cur)
     cost = amount * rate
 
-    if portfolio_index is None:
-        raise ValueError(f"Портфель пользователя с id={user_id} не найден.")
+    portfolios[portfolio_index] = Portfolio.to_dict(portfolio)
+    save_json(PORTFOLIOS_LOC, portfolios)
+
+    return {
+        "currency": currency_code,
+        "amount": amount,
+        "rate": rate,
+        "base_currency": base_cur,
+        "old_balance": old_balance,
+        "new_balance": new_balance,
+        "cost": cost,
+    }
+
+
+def sell(user_id: int, currency: str, amount: float):
+    base_cur = "USD"
+
+    _get_user(user_id)
+    currency_code = _validate_currency(currency)
+    _validate_amount(amount)
+
+    portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
+
+    if currency_code not in portfolio.wallets:
+        raise ValueError(f"Валюта '{currency_code}' отсутствует в портфеле.")
+    wallet = portfolio.get_wallet(currency_code)
+    old_balance = wallet.balance
+    wallet.withdraw(amount)
+    new_balance = wallet.balance
+
+    rate = _get_rate(currency_code, base_cur)
+    cost = amount * rate
+
     portfolios[portfolio_index] = Portfolio.to_dict(portfolio)
     save_json(PORTFOLIOS_LOC, portfolios)
 
