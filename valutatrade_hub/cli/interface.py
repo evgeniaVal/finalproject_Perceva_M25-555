@@ -19,9 +19,25 @@ from valutatrade_hub.core.usecases import (
     sell,
     show_portfolio,
 )
+from valutatrade_hub.core.utils import load_json
+from valutatrade_hub.parser_service.api_clients import (
+    CoinGeckoClient,
+    ExchangeRateApiClient,
+)
+from valutatrade_hub.parser_service.config import ParserConfig
+from valutatrade_hub.parser_service.storage import ExchangeRatesStorage
+from valutatrade_hub.parser_service.updater import RatesUpdater
 
 
 def format_portfolio_result(data: dict) -> str:
+    """Форматирует данные портфеля для вывода пользователю.
+
+    Args:
+        data (dict): Данные портфеля.
+
+    Returns:
+        str: Форматированная строка.
+    """
     lines = [
         f"Портфель пользователя '{data['username']}' (база: {data['base_currency']}):"
     ]
@@ -47,6 +63,15 @@ def format_portfolio_result(data: dict) -> str:
 
 
 def format_trade_result(data: dict, operation: str) -> str:
+    """Форматирует результат торговой операции.
+
+    Args:
+        data (dict): Данные транзакции.
+        operation (str): Тип операции ("Покупка" или "Продажа").
+
+    Returns:
+        str: Форматированная строка.
+    """
     lines = []
     lines.append(
         f"{operation} выполнена: {data['amount']:.4f} {data['currency']} "
@@ -65,6 +90,14 @@ def format_trade_result(data: dict, operation: str) -> str:
 
 
 def format_rate_result(data: dict) -> str:
+    """Форматирует информацию о курсе валюты.
+
+    Args:
+        data (dict): Данные курса.
+
+    Returns:
+        str: Форматированная строка.
+    """
     from_cur = data["from_currency"]
     to_cur = data["to_currency"]
     rate = data["rate"]
@@ -124,6 +157,130 @@ def check_login(login_id):
     return True
 
 
+def handle_update_rates(source_filter: str | None = None):
+    """Обрабатывает команду обновления курсов валют.
+
+    Args:
+        source_filter (str | None): Фильтр по источнику (coingecko/exchangerate).
+    """
+    try:
+        config = ParserConfig()
+
+        clients: list = []
+        if source_filter is None:
+            clients = [
+                CoinGeckoClient(config),
+                ExchangeRateApiClient(config),
+            ]
+        elif source_filter.lower() == "coingecko":
+            clients = [CoinGeckoClient(config)]
+        elif source_filter.lower() in ["exchangerate", "exchangerate-api"]:
+            clients = [ExchangeRateApiClient(config)]
+        else:
+            print(f"Неизвестный источник: {source_filter}")
+            print("Доступные источники: coingecko, exchangerate")
+            return
+
+        rates_path = config.RATES_FILE_PATH or "data/rates.json"
+        history_path = config.HISTORY_FILE_PATH or "data/exchange_rates.json"
+
+        storage = ExchangeRatesStorage(history_path, rates_path)
+        updater = RatesUpdater(clients, storage)
+
+        print("INFO: Starting rates update...")
+        result = updater.run_update()
+
+        if not result or result.get("total_rates", 0) == 0:
+            print("ERROR: No rates fetched from any client")
+            return
+
+        total = result.get("total_rates", 0)
+        timestamp = result.get("timestamp", "")
+        successful = result.get("successful_sources", [])
+        failed = result.get("failed_sources", [])
+
+        print(f"Update successful. Total rates updated: {total}.")
+        if timestamp:
+            print(f"Last refresh: {timestamp}")
+
+        if successful:
+            print(f"Successful sources: {', '.join(successful)}")
+
+        if failed:
+            print(f"Failed sources: {', '.join(failed)}")
+
+    except ApiRequestError as e:
+        print(f"ERROR: {e}")
+    except Exception as e:
+        print(f"ERROR: Unexpected error: {e}")
+
+
+def handle_show_rates(
+    currency_filter: str | None = None,
+    top: int | None = None,
+    base_currency: str | None = None,
+):
+    """Отображает актуальные курсы из кэша.
+
+    Args:
+        currency_filter (str | None): Фильтр по валюте.
+        top (int | None): Количество топовых курсов.
+        base_currency (str | None): Базовая валюта.
+    """
+    try:
+        config = ParserConfig()
+        rates_path = config.RATES_FILE_PATH or "data/rates.json"
+        data = load_json(rates_path, default=dict)
+
+        last_refresh = data.get("last_refresh")
+        pairs = data.get("pairs", {})
+
+        if not pairs:
+            print("Локальный кеш курсов пуст.")
+            print("Выполните 'update-rates', чтобы загрузить данные.")
+            return
+
+        filtered_pairs = {}
+
+        if currency_filter:
+            currency_upper = currency_filter.upper()
+            for pair_key, pair_data in pairs.items():
+                from_cur = pair_key.split("_")[0]
+                if from_cur == currency_upper:
+                    filtered_pairs[pair_key] = pair_data
+
+            if not filtered_pairs:
+                print(f"Курс для '{currency_filter}' не найден в кеше.")
+                return
+        else:
+            filtered_pairs = pairs
+
+        if base_currency:
+            base_upper = base_currency.upper()
+            temp_pairs = {}
+            for pair_key, pair_data in filtered_pairs.items():
+                to_cur = pair_key.split("_")[1]
+                if to_cur == base_upper:
+                    temp_pairs[pair_key] = pair_data
+            filtered_pairs = temp_pairs
+
+        sorted_pairs = sorted(
+            filtered_pairs.items(), key=lambda x: x[1]["rate"], reverse=True
+        )
+
+        if top and top > 0:
+            sorted_pairs = sorted_pairs[:top]
+
+        print(f"Rates from cache (updated at {last_refresh}):")
+        for pair_key, pair_data in sorted_pairs:
+            rate = pair_data["rate"]
+            source = pair_data.get("source", "Unknown")
+            print(f"- {pair_key}: {rate} (source: {source})")
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+
+
 class MyArgumentParser(ArgumentParser):
     def error(self, message: str):
         raise ValueError(message)
@@ -167,6 +324,16 @@ def build_parser() -> ArgumentParser:
     p_get_rate.add_argument("-f", "--from", dest="from_cur", type=str, required=True)
     p_get_rate.add_argument("-t", "--to", dest="to_cur", type=str, required=True)
     p_get_rate.set_defaults(command="get-rate")
+
+    p_update_rates = sub.add_parser("update-rates", add_help=False)
+    p_update_rates.add_argument("-s", "--source", type=str, required=False)
+    p_update_rates.set_defaults(command="update-rates")
+
+    p_show_rates = sub.add_parser("show-rates", add_help=False)
+    p_show_rates.add_argument("-c", "--currency", type=str, required=False)
+    p_show_rates.add_argument("-t", "--top", type=int, required=False)
+    p_show_rates.add_argument("-b", "--base", type=str, required=False)
+    p_show_rates.set_defaults(command="show-rates")
 
     return parser
 
@@ -232,11 +399,18 @@ def process_command(logged_id, parser, tokens):
             if result:
                 print(format_rate_result(result))
             return logged_id, True
+        case "update-rates":
+            handle_update_rates(ns.source)
+            return logged_id, True
+        case "show-rates":
+            handle_show_rates(ns.currency, ns.top, ns.base)
+            return logged_id, True
         case _:
             return logged_id, True
 
 
 def main():
+    """Главная функция - точка входа в приложение."""
     parser = build_parser()
     print("Приветствие!")
     not_over = True

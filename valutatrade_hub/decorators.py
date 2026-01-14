@@ -43,10 +43,10 @@ def _extract_params(func: Callable, args: tuple, kwargs: dict) -> dict:
     sig = inspect.signature(func)
     bound = sig.bind(*args, **kwargs)
     bound.apply_defaults()
-    
+
     params = {}
     arguments = bound.arguments
-    
+
     param_mapping = {
         "username": "username",
         "user_id": "user_id",
@@ -54,11 +54,11 @@ def _extract_params(func: Callable, args: tuple, kwargs: dict) -> dict:
         "currency_code": "currency_code",
         "amount": "amount",
     }
-    
+
     for arg_key, param_key in param_mapping.items():
         if arg_key in arguments:
             params[param_key] = arguments[arg_key]
-    
+
     return params
 
 
@@ -71,11 +71,11 @@ def _update_params_from_result(params: dict, result_data: dict) -> None:
         "old_balance": "old_balance",
         "new_balance": "new_balance",
     }
-    
+
     for result_key, param_key in result_mapping.items():
         if result_key in result_data:
             params[param_key] = result_data[result_key]
-    
+
     if "username" in params:
         params.pop("user_id", None)
 
@@ -88,35 +88,35 @@ def _build_log_message(
     error: Exception | None = None,
 ) -> str:
     log_parts = [action]
-    
+
     if "username" in params:
         log_parts.append(f"user='{params['username']}'")
     elif "user_id" in params:
         log_parts.append(f"user_id={params['user_id']}")
-    
+
     if "currency_code" in params:
         log_parts.append(f"currency='{params['currency_code']}'")
-    
+
     if "amount" in params:
         log_parts.append(f"amount={params['amount']:.4f}")
-    
+
     if "rate" in params:
         log_parts.append(f"rate={params['rate']:.2f}")
-    
+
     if "base" in params:
         log_parts.append(f"base='{params['base']}'")
-    
+
     if verbose and "old_balance" in params and "new_balance" in params:
         log_parts.append(
             f"balance_change={params['old_balance']:.4f}->{params['new_balance']:.4f}"
         )
-    
+
     log_parts.append("result=OK" if success else "result=ERROR")
-    
+
     if error:
         log_parts.append(f"error_type={type(error).__name__}")
         log_parts.append(f"error_message='{error}'")
-    
+
     return " ".join(log_parts)
 
 

@@ -6,6 +6,11 @@ _logger: logging.Logger | None = None
 
 
 def get_logger() -> logging.Logger:
+    """Возвращает настроенный логгер приложения.
+
+    Returns:
+        logging.Logger: Логгер с ротацией файлов.
+    """
     global _logger
     if _logger is None:
         log_path = Path("logs")

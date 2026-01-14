@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -38,7 +38,13 @@ class ParserConfig:
     BASE_CURRENCY: str = "USD"
     FIAT_CURRENCIES: tuple = ("EUR", "GBP", "RUB")
     CRYPTO_CURRENCIES: tuple = ("BTC", "ETH", "SOL")
-    CRYPTO_ID_MAP: dict | None = None
+    CRYPTO_ID_MAP: dict[str, str] = field(
+        default_factory=lambda: {
+            "BTC": "bitcoin",
+            "ETH": "ethereum",
+            "SOL": "solana",
+        }
+    )
 
     RATES_FILE_PATH: str | None = None
     HISTORY_FILE_PATH: str | None = None
@@ -46,13 +52,6 @@ class ParserConfig:
     REQUEST_TIMEOUT: int = 10
 
     def __post_init__(self):
-        if self.CRYPTO_ID_MAP is None:
-            self.CRYPTO_ID_MAP = {
-                "BTC": "bitcoin",
-                "ETH": "ethereum",
-                "SOL": "solana",
-            }
-
         if self.RATES_FILE_PATH is None:
             project_root = Path(__file__).parent.parent.parent
             self.RATES_FILE_PATH = str(project_root / "data" / "rates.json")

@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+
+from valutatrade_hub.core.exceptions import ApiRequestError
 from valutatrade_hub.decorators import log_action
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
@@ -31,6 +34,18 @@ def _get_portfolio(user_id: int):
 
 @log_action(action_name="REGISTER")
 def register(username: str, password: str) -> dict:
+    """Регистрирует нового пользователя в системе.
+
+    Args:
+        username (str): Имя пользователя.
+        password (str): Пароль в открытом виде.
+
+    Raises:
+        ValueError: Если имя пользователя уже занято или пароль невалиден.
+
+    Returns:
+        dict: Словарь с user_id и username зарегистрированного пользователя.
+    """
     uname = username.strip()
     users = _db.load_users()
     if any(u["username"] == uname for u in users):
@@ -48,6 +63,18 @@ def register(username: str, password: str) -> dict:
 
 @log_action(action_name="LOGIN")
 def login(username: str, password: str) -> dict:
+    """Выполняет вход пользователя в систему.
+
+    Args:
+        username (str): Имя пользователя.
+        password (str): Пароль для проверки.
+
+    Raises:
+        ValueError: Если пользователь не найден или пароль неверный.
+
+    Returns:
+        dict: Словарь с user_id и username.
+    """
     uname = username.strip()
     users = _db.load_users()
     for u in users:
@@ -61,6 +88,18 @@ def login(username: str, password: str) -> dict:
 
 
 def show_portfolio(user_id: int, base: str):
+    """Отображает портфель пользователя с оценкой в базовой валюте.
+
+    Args:
+        user_id (int): Идентификатор пользователя.
+        base (str): Базовая валюта для расчета стоимости.
+
+    Raises:
+        ValueError: Если пользователь не найден или валюта невалидна.
+
+    Returns:
+        dict: Словарь с данными портфеля (username, base_currency, wallets, total).
+    """
     user = _get_user(user_id)
     username = user.get("username", "")
     portfolio, _, _ = _get_portfolio(user_id)
@@ -69,6 +108,9 @@ def show_portfolio(user_id: int, base: str):
         if isinstance(base, str) and base.strip()
         else _settings.base_currency
     )
+
+    _check_and_refresh_rates()
+
     wallets_info = []
     total = 0.0
     for code, wallet in portfolio.wallets.items():
@@ -108,6 +150,8 @@ def _execute_trade(
     username = user.get("username", "")
     currency_code = get_currency(currency).code
 
+    _check_and_refresh_rates()
+
     portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
 
     if currency_code not in portfolio.wallets:
@@ -145,19 +189,132 @@ def _execute_trade(
 
 @log_action(action_name="BUY", verbose=True)
 def buy(user_id: int, currency: str, amount: float):
+    """Покупает указанное количество валюты.
+
+    Args:
+        user_id (int): Идентификатор пользователя.
+        currency (str): Код покупаемой валюты.
+        amount (float): Количество валюты для покупки.
+
+    Raises:
+        ValueError: Если параметры невалидны.
+        CurrencyNotFoundError: Если валюта не найдена.
+
+    Returns:
+        dict: Информация о транзакции.
+    """
     return _execute_trade(user_id, currency, amount, "buy")
 
 
 @log_action(action_name="SELL", verbose=True)
 def sell(user_id: int, currency: str, amount: float):
+    """Продает указанное количество валюты.
+
+    Args:
+        user_id (int): Идентификатор пользователя.
+        currency (str): Код продаваемой валюты.
+        amount (float): Количество валюты для продажи.
+
+    Raises:
+        ValueError: Если параметры невалидны или кошелек не найден.
+        InsufficientFundsError: Если недостаточно средств.
+        CurrencyNotFoundError: Если валюта не найдена.
+
+    Returns:
+        dict: Информация о транзакции.
+    """
     return _execute_trade(user_id, currency, amount, "sell")
 
 
+def _check_and_refresh_rates() -> None:
+    rates_data = _db.load_rates()
+    if not rates_data:
+        _refresh_rates_from_api()
+        return
+
+    last_refresh_str = rates_data.get("last_refresh")
+    if not last_refresh_str:
+        _refresh_rates_from_api()
+        return
+
+    try:
+        last_refresh = datetime.fromisoformat(last_refresh_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        age_seconds = (now - last_refresh).total_seconds()
+
+        if age_seconds > _settings.rates_ttl:
+            _refresh_rates_from_api()
+        else:
+            pairs = rates_data.get("pairs", {})
+            formatted_rates = {
+                pair_key: pair_data for pair_key, pair_data in pairs.items()
+            }
+            formatted_rates["last_refresh"] = last_refresh_str
+            Portfolio.EXCHANGE_RATES = formatted_rates
+    except (ValueError, AttributeError):
+        _refresh_rates_from_api()
+
+
+def _refresh_rates_from_api() -> None:
+    try:
+        from valutatrade_hub.parser_service.api_clients import (
+            CoinGeckoClient,
+            ExchangeRateApiClient,
+        )
+        from valutatrade_hub.parser_service.config import ParserConfig
+        from valutatrade_hub.parser_service.storage import ExchangeRatesStorage
+        from valutatrade_hub.parser_service.updater import RatesUpdater
+
+        config = ParserConfig()
+        clients = [
+            CoinGeckoClient(config),
+            ExchangeRateApiClient(config),
+        ]
+        rates_path = config.RATES_FILE_PATH or "data/rates.json"
+        history_path = config.HISTORY_FILE_PATH or "data/exchange_rates.json"
+
+        storage = ExchangeRatesStorage(history_path, rates_path)
+        updater = RatesUpdater(clients, storage)
+        result = updater.run_update()
+
+        if not result or result.get("total_rates", 0) == 0:
+            raise ApiRequestError("Failed to fetch rates from any source")
+
+        rates_data = _db.load_rates()
+        pairs = rates_data.get("pairs", {})
+        formatted_rates = {pair_key: pair_data for pair_key, pair_data in pairs.items()}
+        formatted_rates["last_refresh"] = rates_data.get("last_refresh")
+
+        Portfolio.EXCHANGE_RATES = formatted_rates
+    except ImportError as e:
+        raise ApiRequestError(f"Parser service not available: {e}")
+    except Exception as e:
+        if isinstance(e, ApiRequestError):
+            raise
+        raise ApiRequestError(f"Rate update failed: {e}")
+
+
 def get_rate(from_cur: str, to_cur: str) -> dict:
+    """Получает курс обмена между двумя валютами.
+
+    Args:
+        from_cur (str): Код исходной валюты.
+        to_cur (str): Код целевой валюты.
+
+    Raises:
+        CurrencyNotFoundError: Если одна из валют не найдена.
+        ValueError: Если курс недоступен.
+
+    Returns:
+        dict: Информация о курсе (from_currency, to_currency, rate,
+            reverse_rate, updated_at).
+    """
     from_currency_obj = get_currency(from_cur)
     to_currency_obj = get_currency(to_cur)
     from_code = from_currency_obj.code
     to_code = to_currency_obj.code
+
+    _check_and_refresh_rates()
 
     rate = Portfolio.get_rate(from_code, to_code)
     reverse_rate = 1.0 / rate if rate != 0 else 0.0

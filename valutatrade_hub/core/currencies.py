@@ -4,6 +4,13 @@ from valutatrade_hub.core.exceptions import CurrencyNotFoundError
 
 
 class Currency(ABC):
+    """Базовый абстрактный класс для всех типов валют.
+
+    Attributes:
+        _name (str): Полное название валюты.
+        _code (str): Код валюты (2-5 символов, верхний регистр).
+    """
+
     _name: str
     _code: str
 
@@ -38,10 +45,21 @@ class Currency(ABC):
 
     @abstractmethod
     def get_display_info(self) -> str:
+        """Возвращает строковое представление валюты для отображения.
+
+        Returns:
+            str: Форматированная строка с информацией о валюте.
+        """
         pass
 
 
 class FiatCurrency(Currency):
+    """Фиатная валюта (государственная валюта).
+
+    Attributes:
+        _issuing_country (str): Страна или зона эмиссии валюты.
+    """
+
     _issuing_country: str
 
     @property
@@ -59,10 +77,22 @@ class FiatCurrency(Currency):
         self.issuing_country = issuing_country
 
     def get_display_info(self) -> str:
+        """Возвращает строковое представление фиатной валюты.
+
+        Returns:
+            str: Форматированная строка с кодом, названием и страной эмиссии.
+        """
         return f"[FIAT] {self.code} — {self.name} (Issuing: {self.issuing_country})"
 
 
 class CryptoCurrency(Currency):
+    """Криптовалюта.
+
+    Attributes:
+        _algorithm (str): Алгоритм консенсуса/майнинга.
+        _market_cap (float): Рыночная капитализация.
+    """
+
     _algorithm: str
     _market_cap: float
 
@@ -92,6 +122,11 @@ class CryptoCurrency(Currency):
         self.market_cap = market_cap
 
     def get_display_info(self) -> str:
+        """Возвращает строковое представление криптовалюты.
+
+        Returns:
+            str: Форматированная строка с кодом, названием, алгоритмом и капитализацией.
+        """
         return (
             f"[CRYPTO] {self.code} — {self.name}"
             f" (Algo: {self.algorithm}, MCAP: {self.market_cap:.2e})"
@@ -108,6 +143,17 @@ _CURRENCY_REGISTRY: dict[str, Currency] = {
 
 
 def get_currency(code: str) -> Currency:
+    """Возвращает объект валюты по её коду.
+
+    Args:
+        code (str): Код валюты для поиска.
+
+    Raises:
+        CurrencyNotFoundError: Если валюта не найдена в реестре.
+
+    Returns:
+        Currency: Объект валюты (FiatCurrency или CryptoCurrency).
+    """
     if not isinstance(code, str) or not code.strip():
         raise CurrencyNotFoundError(code if code else "")
     normalized_code = code.strip().upper()
@@ -118,4 +164,9 @@ def get_currency(code: str) -> Currency:
 
 
 def get_supported_currencies() -> list[str]:
+    """Возвращает список всех поддерживаемых кодов валют.
+
+    Returns:
+        list[str]: Отсортированный список кодов валют.
+    """
     return sorted(_CURRENCY_REGISTRY.keys())

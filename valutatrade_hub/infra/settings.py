@@ -6,11 +6,13 @@ from typing import Any
 class SettingsLoader:
     """
     Singleton для управления конфигурацией приложения.
-    Реализован через __new__ для простоты и читабельности:
+
+    Реализован через __new__ для простоты и читаемости:
     - Не требует метакласса
     - Явный контроль создания экземпляра в одном месте
     - Понятен, так как рассматривался в курсах
     """
+
     _instance: "SettingsLoader | None" = None
     _initialized: bool = False
 
@@ -54,9 +56,19 @@ class SettingsLoader:
         self._config = defaults
 
     def get(self, key: str, default: Any = None) -> Any:
+        """Получает значение конфигурации по ключу.
+
+        Args:
+            key (str): Ключ настройки.
+            default (Any): Значение по умолчанию.
+
+        Returns:
+            Any: Значение настройки.
+        """
         return self._config.get(key, default)
 
     def reload(self) -> None:
+        """Перезагружает конфигурацию из файла."""
         self._config = {}
         self._load_config()
 

@@ -7,11 +7,13 @@ from valutatrade_hub.infra.settings import SettingsLoader
 class DatabaseManager:
     """
     Singleton для управления доступом к данным (JSON-хранилище).
-    Реализован через __new__ для простоты и читабельности:
+
+    Реализован через __new__ для простоты и читаемости:
     - Не требует метакласса
     - Явный контроль создания экземпляра в одном месте
     - Понятен, так как рассматривался в курсах
     """
+
     _instance: "DatabaseManager | None" = None
     _initialized: bool = False
 
