@@ -1,3 +1,4 @@
+from valutatrade_hub.decorators import log_action
 from valutatrade_hub.infra.database import DatabaseManager
 from valutatrade_hub.infra.settings import SettingsLoader
 
@@ -28,7 +29,8 @@ def _get_portfolio(user_id: int):
     return Portfolio.from_dict(portfolio_dict), idx, portfolios
 
 
-def register(username: str, password: str):
+@log_action(action_name="REGISTER")
+def register(username: str, password: str) -> dict:
     uname = username.strip()
     users = _db.load_users()
     if any(u["username"] == uname for u in users):
@@ -41,17 +43,18 @@ def register(username: str, password: str):
     portfolios = _db.load_portfolios()
     portfolios.append(Portfolio.to_dict(new_portfolio))
     _db.save_portfolios(portfolios)
-    return new_id
+    return {"user_id": new_id, "username": uname}
 
 
-def login(username: str, password: str) -> int:
+@log_action(action_name="LOGIN")
+def login(username: str, password: str) -> dict:
     uname = username.strip()
     users = _db.load_users()
     for u in users:
         if u["username"] == uname:
             user = User.from_dict(u)
             if user.verify_password(password):
-                return user.user_id
+                return {"user_id": user.user_id, "username": uname}
             else:
                 raise ValueError("Неверный пароль.")
     raise ValueError(f"Пользователь '{uname}' не найден.")
@@ -101,7 +104,8 @@ def _execute_trade(
     amount: float,
     operation: str,
 ) -> dict:
-    _get_user(user_id)
+    user = _get_user(user_id)
+    username = user.get("username", "")
     currency_code = get_currency(currency).code
 
     portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
@@ -128,6 +132,7 @@ def _execute_trade(
     _db.save_portfolios(portfolios)
 
     return {
+        "username": username,
         "currency": currency_code,
         "amount": amount,
         "rate": rate,
@@ -138,10 +143,12 @@ def _execute_trade(
     }
 
 
+@log_action(action_name="BUY", verbose=True)
 def buy(user_id: int, currency: str, amount: float):
     return _execute_trade(user_id, currency, amount, "buy")
 
 
+@log_action(action_name="SELL", verbose=True)
 def sell(user_id: int, currency: str, amount: float):
     return _execute_trade(user_id, currency, amount, "sell")
 

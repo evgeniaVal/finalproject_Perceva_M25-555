@@ -191,16 +191,21 @@ def process_command(logged_id, parser, tokens):
             print("До свидания!")
             return logged_id, False
         case "register":
-            idx = register(ns.username, ns.password)
-            print(
-                f"Пользователь '{ns.username}' успешно зарегистрирован (id={idx})."
-                f" Войдите: login --username {ns.username} --password ****"
-            )
+            result = register(ns.username, ns.password)
+            if result:
+                idx = result["user_id"]
+                print(
+                    f"Пользователь '{ns.username}' успешно зарегистрирован (id={idx})."
+                    f" Войдите: login --username {ns.username} --password ****"
+                )
             return logged_id, True
         case "login":
-            new_id = login(ns.username, ns.password)
-            print(f"Вы вошли как '{ns.username}'.")
-            return new_id, True
+            result = login(ns.username, ns.password)
+            if result:
+                new_id = result["user_id"]
+                print(f"Вы вошли как '{ns.username}'.")
+                return new_id, True
+            return logged_id, True
         case "show-portfolio":
             if not check_login(logged_id):
                 return logged_id, True
