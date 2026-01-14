@@ -406,6 +406,13 @@ class Portfolio:
                     f"Invalid exchange rate for pair '{to_cur}' to '{from_cur}': {rate}"
                 )
             return 1.0 / float(rate)
+        if from_cur != "USD" and to_cur != "USD":
+            try:
+                from_to_usd = Portfolio.get_rate(from_cur, "USD")
+                usd_to_target = Portfolio.get_rate("USD", to_cur)
+                return from_to_usd * usd_to_target
+            except ValueError:
+                pass
         raise ValueError(
             f"Exchange rate for pair '{from_cur}' to '{to_cur}' not found."
         )

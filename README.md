@@ -2,6 +2,12 @@
 
 **ValutaTrade Hub** — это приложение для управления криптовалютным и фиатным портфелем с автоматическим обновлением курсов через внешние API.
 
+## Демонстрация
+
+[![asciicast](https://asciinema.org/a/zrfPSXiDy3DqvqB6.svg)](https://asciinema.org/a/zrfPSXiDy3DqvqB6)
+
+*Демонстрация.*
+
 ## Описание проекта
 
 ValutaTrade Hub позволяет:

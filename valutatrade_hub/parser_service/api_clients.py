@@ -48,7 +48,6 @@ class CoinGeckoClient(BaseApiClient):
             response = requests.get(
                 url, params=params, timeout=self.config.REQUEST_TIMEOUT
             )
-            
             if response.status_code == 429:
                 raise ApiRequestError(
                     "CoinGecko: Rate limit exceeded (429). Please try again later."
@@ -61,7 +60,6 @@ class CoinGeckoClient(BaseApiClient):
                 raise ApiRequestError(
                     "CoinGecko: Access forbidden (403). API key may be invalid."
                 )
-            
             response.raise_for_status()
             data = response.json()
 
@@ -107,7 +105,6 @@ class ExchangeRateApiClient(BaseApiClient):
 
         try:
             response = requests.get(url, timeout=self.config.REQUEST_TIMEOUT)
-            
             if response.status_code == 429:
                 raise ApiRequestError(
                     "ExchangeRate-API: Rate limit exceeded (429). "
@@ -121,7 +118,6 @@ class ExchangeRateApiClient(BaseApiClient):
                 raise ApiRequestError(
                     "ExchangeRate-API: Access forbidden (403). API key may be invalid."
                 )
-            
             response.raise_for_status()
             data = response.json()
 
@@ -135,7 +131,7 @@ class ExchangeRateApiClient(BaseApiClient):
             for code in self.config.FIAT_CURRENCIES:
                 if code in rates:
                     pair_key = f"{code}_{self.config.BASE_CURRENCY}"
-                    result[pair_key] = rates[code]
+                    result[pair_key] = 1.0 / rates[code]
 
             return result
 
