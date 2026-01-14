@@ -1,6 +1,7 @@
 data/portfolios.json
 data/rates.json
 data/users.json
+data/exchange_rates.json
 logs/
 
 # Byte-compiled / optimized / DLL files
