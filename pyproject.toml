@@ -30,6 +30,16 @@ exclude = ["venv", ".venv", "dist", "__pycache__"]
 select = ["E", "F", "I"]
 ignore = []
 
+[tool.valutatrade]
+data_dir = "data"
+logs_dir = "logs"
+users_file = "users.json"
+portfolios_file = "portfolios.json"
+rates_file = "rates.json"
+rates_ttl_seconds = 3600
+default_base_currency = "USD"
+log_format = "human"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

@@ -1,48 +1,52 @@
+from valutatrade_hub.infra.database import DatabaseManager
+from valutatrade_hub.infra.settings import SettingsLoader
+
 from .currencies import get_currency
 from .models import Portfolio, User
-from .utils import load_json, save_json
 
-USERS_LOC = "data/users.json"
-PORTFOLIOS_LOC = "data/portfolios.json"
-BASE_CURRENCY = "USD"
+_db = DatabaseManager()
+_settings = SettingsLoader()
+
+
+def _find_by_id(items: list[dict], user_id: int, item_name: str) -> tuple[dict, int]:
+    for idx, item in enumerate(items):
+        if int(item.get("user_id", -1)) == int(user_id):
+            return item, idx
+    raise ValueError(f"{item_name} с id={user_id} не найден.")
 
 
 def _get_user(user_id: int) -> dict:
     """Возвращает пользователя по id."""
-    users = load_json(USERS_LOC, default=list)
-    for u in users:
-        if int(u.get("user_id", -1)) == int(user_id):
-            return u
-    raise ValueError(f"Пользователь с id={user_id} не найден.")
+    users = _db.load_users()
+    user, _ = _find_by_id(users, user_id, "Пользователь")
+    return user
 
 
 def _get_portfolio(user_id: int):
-    portfolios = load_json(PORTFOLIOS_LOC, default=list)
-    for idx, p in enumerate(portfolios):
-        if int(p.get("user_id", -1)) == int(user_id):
-            return Portfolio.from_dict(p), idx, portfolios
-    raise ValueError(f"Портфель пользователя с id={user_id} не найден.")
+    portfolios = _db.load_portfolios()
+    portfolio_dict, idx = _find_by_id(portfolios, user_id, "Портфель пользователя")
+    return Portfolio.from_dict(portfolio_dict), idx, portfolios
 
 
 def register(username: str, password: str):
     uname = username.strip()
-    users = load_json(USERS_LOC, default=list)
+    users = _db.load_users()
     if any(u["username"] == uname for u in users):
         raise ValueError(f"Имя пользователя '{uname}' уже занято.")
     new_id = max((u["user_id"] for u in users), default=0) + 1
     new_user = User.from_plain_password(new_id, uname, password)
     users.append(User.to_dict(new_user))
-    save_json(USERS_LOC, users)
+    _db.save_users(users)
     new_portfolio = Portfolio(new_id, {})
-    portfolios = load_json(PORTFOLIOS_LOC, default=list)
+    portfolios = _db.load_portfolios()
     portfolios.append(Portfolio.to_dict(new_portfolio))
-    save_json(PORTFOLIOS_LOC, portfolios)
+    _db.save_portfolios(portfolios)
     return new_id
 
 
 def login(username: str, password: str) -> int:
     uname = username.strip()
-    users = load_json(USERS_LOC, default=list)
+    users = _db.load_users()
     for u in users:
         if u["username"] == uname:
             user = User.from_dict(u)
@@ -57,11 +61,14 @@ def show_portfolio(user_id: int, base: str):
     user = _get_user(user_id)
     username = user.get("username", "")
     portfolio, _, _ = _get_portfolio(user_id)
-    base_cur = base.strip().upper() if isinstance(base, str) else "USD"
+    base_cur = (
+        base.strip().upper()
+        if isinstance(base, str) and base.strip()
+        else _settings.base_currency
+    )
     wallets_info = []
     total = 0.0
-    for code in portfolio.wallets.keys():
-        wallet = portfolio.get_wallet(code)
+    for code, wallet in portfolio.wallets.items():
         amount = float(wallet.balance)
 
         try:
@@ -88,67 +95,55 @@ def show_portfolio(user_id: int, base: str):
     }
 
 
-def buy(user_id: int, currency: str, amount: float):
+def _execute_trade(
+    user_id: int,
+    currency: str,
+    amount: float,
+    operation: str,
+) -> dict:
     _get_user(user_id)
     currency_code = get_currency(currency).code
 
     portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
 
     if currency_code not in portfolio.wallets:
+        if operation == "sell":
+            raise ValueError(
+                f"У вас нет кошелька {currency_code}. Добавьте валюту."
+                " Она создаётся автоматически при первой покупке."
+            )
         portfolio.add_currency(currency_code)
     wallet = portfolio.get_wallet(currency_code)
     old_balance = wallet.balance
-    wallet.deposit(amount)
+    if operation == "buy":
+        wallet.deposit(amount)
+    else:
+        wallet.withdraw(amount)
     new_balance = wallet.balance
 
-    rate = Portfolio.get_rate(currency_code, BASE_CURRENCY)
+    rate = Portfolio.get_rate(currency_code, _settings.base_currency)
     cost = amount * rate
 
     portfolios[portfolio_index] = Portfolio.to_dict(portfolio)
-    save_json(PORTFOLIOS_LOC, portfolios)
+    _db.save_portfolios(portfolios)
 
     return {
         "currency": currency_code,
         "amount": amount,
         "rate": rate,
-        "base_currency": BASE_CURRENCY,
+        "base_currency": _settings.base_currency,
         "old_balance": old_balance,
         "new_balance": new_balance,
         "cost": cost,
     }
+
+
+def buy(user_id: int, currency: str, amount: float):
+    return _execute_trade(user_id, currency, amount, "buy")
 
 
 def sell(user_id: int, currency: str, amount: float):
-    _get_user(user_id)
-    currency_code = get_currency(currency).code
-
-    portfolio, portfolio_index, portfolios = _get_portfolio(user_id)
-
-    if currency_code not in portfolio.wallets:
-        raise ValueError(
-            f"У вас нет кошелька {currency_code}. Добавьте валюту."
-            " Она создаётся автоматически при первой покупке."
-        )
-    wallet = portfolio.get_wallet(currency_code)
-    old_balance = wallet.balance
-    wallet.withdraw(amount)
-    new_balance = wallet.balance
-
-    rate = Portfolio.get_rate(currency_code, BASE_CURRENCY)
-    cost = amount * rate
-
-    portfolios[portfolio_index] = Portfolio.to_dict(portfolio)
-    save_json(PORTFOLIOS_LOC, portfolios)
-
-    return {
-        "currency": currency_code,
-        "amount": amount,
-        "rate": rate,
-        "base_currency": BASE_CURRENCY,
-        "old_balance": old_balance,
-        "new_balance": new_balance,
-        "cost": cost,
-    }
+    return _execute_trade(user_id, currency, amount, "sell")
 
 
 def get_rate(from_cur: str, to_cur: str) -> dict:

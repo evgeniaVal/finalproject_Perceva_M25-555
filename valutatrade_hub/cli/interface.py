@@ -67,8 +67,8 @@ def format_trade_result(data: dict, operation: str) -> str:
 def format_rate_result(data: dict) -> str:
     from_cur = data["from_currency"]
     to_cur = data["to_currency"]
-    rate_str = str(data["rate"])
-    reverse_rate_str = str(data["reverse_rate"])
+    rate = data["rate"]
+    reverse_rate = data["reverse_rate"]
     updated_at = data.get("updated_at")
 
     lines = []
@@ -76,11 +76,11 @@ def format_rate_result(data: dict) -> str:
     if updated_at:
         dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
         time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
-        lines.append(f"Курс {from_cur}→{to_cur}: {rate_str} (обновлено: {time_str})")
+        lines.append(f"Курс {from_cur}→{to_cur}: {rate} (обновлено: {time_str})")
     else:
-        lines.append(f"Курс {from_cur}→{to_cur}: {rate_str}")
+        lines.append(f"Курс {from_cur}→{to_cur}: {rate}")
 
-    lines.append(f"Обратный курс {to_cur}→{from_cur}: {reverse_rate_str}")
+    lines.append(f"Обратный курс {to_cur}→{from_cur}: {reverse_rate}")
 
     return "\n".join(lines)
 
@@ -92,22 +92,19 @@ def handle_errors(func):
             return func(*args, **kwargs)
         except InsufficientFundsError as e:
             print(f"Ошибка: {e}")
-            return None
         except CurrencyNotFoundError as e:
             print(f"Ошибка: {e}")
             supported = get_supported_currencies()
             print(f"Поддерживаемые валюты: {', '.join(supported)}")
             print("Используйте 'get-rate --from <код> --to <код>' для получения курса")
-            return None
         except ApiRequestError as e:
             print(f"Ошибка: {e}")
             print(
                 "Пожалуйста, повторите попытку позже или проверьте сетевое соединение."
             )
-            return None
         except Exception as e:
             print(e)
-            return None
+        return None
 
     return wrapper
 

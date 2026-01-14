@@ -1,8 +1,11 @@
 import json
 from pathlib import Path
+from typing import Callable, TypeVar
+
+T = TypeVar('T')
 
 
-def load_json(path, default=list):
+def load_json(path, default: Callable[[], T] = list) -> T:
     path = Path(path)
     try:
         with path.open("r", encoding="utf-8") as f:
