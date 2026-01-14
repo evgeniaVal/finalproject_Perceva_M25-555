@@ -281,15 +281,7 @@ class Portfolio:
 
     _user_id: int
     _wallets: dict[str, Wallet]
-
-    EXCHANGE_RATES = {  # TODO(): загрузка из внешнего источника
-        "EUR_USD": {"rate": 1.0786, "updated_at": "2025-10-09T10:30:00+00:00"},
-        "BTC_USD": {"rate": 59337.21, "updated_at": "2025-10-09T10:29:42+00:00"},
-        "RUB_USD": {"rate": 0.01016, "updated_at": "2025-10-09T10:31:12+00:00"},
-        "ETH_USD": {"rate": 3720.00, "updated_at": "2025-10-09T10:35:00+00:00"},
-        "source": "ParserService",
-        "last_refresh": "2025-10-09T10:35:00+00:00",
-    }
+    EXCHANGE_RATES: dict = {}
 
     def __init__(self, user_id: int, wallets: dict[str, Wallet]) -> None:
         if not isinstance(user_id, int) or user_id <= 0:

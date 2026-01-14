@@ -11,6 +11,11 @@ class SettingsLoader:
     - Не требует метакласса
     - Явный контроль создания экземпляра в одном месте
     - Понятен, так как рассматривался в курсах
+
+    Attributes:
+        _instance (SettingsLoader | None): Единственный экземпляр класса.
+        _initialized (bool): Флаг инициализации для предотвращения повторной загрузки.
+        _config (dict[str, Any]): Словарь с настройками приложения.
     """
 
     _instance: "SettingsLoader | None" = None

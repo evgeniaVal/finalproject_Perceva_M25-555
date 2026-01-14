@@ -48,6 +48,20 @@ class CoinGeckoClient(BaseApiClient):
             response = requests.get(
                 url, params=params, timeout=self.config.REQUEST_TIMEOUT
             )
+            
+            if response.status_code == 429:
+                raise ApiRequestError(
+                    "CoinGecko: Rate limit exceeded (429). Please try again later."
+                )
+            elif response.status_code == 401:
+                raise ApiRequestError(
+                    "CoinGecko: Unauthorized (401). Check your API key."
+                )
+            elif response.status_code == 403:
+                raise ApiRequestError(
+                    "CoinGecko: Access forbidden (403). API key may be invalid."
+                )
+            
             response.raise_for_status()
             data = response.json()
 
@@ -93,6 +107,21 @@ class ExchangeRateApiClient(BaseApiClient):
 
         try:
             response = requests.get(url, timeout=self.config.REQUEST_TIMEOUT)
+            
+            if response.status_code == 429:
+                raise ApiRequestError(
+                    "ExchangeRate-API: Rate limit exceeded (429). "
+                    "Please try again later."
+                )
+            elif response.status_code == 401:
+                raise ApiRequestError(
+                    "ExchangeRate-API: Unauthorized (401). Check your API key."
+                )
+            elif response.status_code == 403:
+                raise ApiRequestError(
+                    "ExchangeRate-API: Access forbidden (403). API key may be invalid."
+                )
+            
             response.raise_for_status()
             data = response.json()
 

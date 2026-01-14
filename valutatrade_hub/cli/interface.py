@@ -151,6 +151,14 @@ get_rate = handle_errors(get_rate)
 
 
 def check_login(login_id):
+    """Проверяет, что пользователь авторизован.
+
+    Args:
+        login_id: Идентификатор залогиненного пользователя.
+
+    Returns:
+        bool: True, если пользователь авторизован, иначе False.
+    """
     if login_id is None or login_id <= 0:
         print("Сначала выполните login.")
         return False
@@ -287,6 +295,11 @@ class MyArgumentParser(ArgumentParser):
 
 
 def build_parser() -> ArgumentParser:
+    """Создает парсер аргументов командной строки для всех команд CLI.
+
+    Returns:
+        ArgumentParser: Настроенный парсер с подкомандами.
+    """
     parser = MyArgumentParser(prog="valutatrade", add_help=False)
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -339,6 +352,14 @@ def build_parser() -> ArgumentParser:
 
 
 def get_input(prompt_msg="> "):
+    """Получает ввод пользователя и разбивает на токены.
+
+    Args:
+        prompt_msg (str): Приглашение для ввода.
+
+    Returns:
+        list[str]: Список токенов команды.
+    """
     try:
         input_str = prompt_string(prompt_msg).strip()  # type: ignore
         tokens = shlex_split(input_str) or []
@@ -348,6 +369,16 @@ def get_input(prompt_msg="> "):
 
 
 def process_command(logged_id, parser, tokens):
+    """Обрабатывает команду пользователя.
+
+    Args:
+        logged_id: ID залогиненного пользователя или None.
+        parser (ArgumentParser): Парсер команд.
+        tokens (list[str]): Токены введенной команды.
+
+    Returns:
+        tuple[int | None, bool]: Кортеж (новый logged_id, продолжать ли работу).
+    """
     try:
         ns = parser.parse_args(tokens)
     except ValueError:

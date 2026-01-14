@@ -12,6 +12,11 @@ class DatabaseManager:
     - Не требует метакласса
     - Явный контроль создания экземпляра в одном месте
     - Понятен, так как рассматривался в курсах
+
+    Attributes:
+        _instance (DatabaseManager | None): Единственный экземпляр класса.
+        _initialized (bool): Флаг инициализации синглтона.
+        _settings (SettingsLoader): Загрузчик настроек приложения.
     """
 
     _instance: "DatabaseManager | None" = None
