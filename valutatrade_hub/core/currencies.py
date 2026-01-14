@@ -59,7 +59,7 @@ class FiatCurrency(Currency):
         self.issuing_country = issuing_country
 
     def get_display_info(self) -> str:
-        return f"[FIAT] {self.code} - {self.name} (Issuing: {self.issuing_country})"
+        return f"[FIAT] {self.code} — {self.name} (Issuing: {self.issuing_country})"
 
 
 class CryptoCurrency(Currency):
@@ -93,7 +93,7 @@ class CryptoCurrency(Currency):
 
     def get_display_info(self) -> str:
         return (
-            f"[CRYPTO] {self.code} - {self.name}"
+            f"[CRYPTO] {self.code} — {self.name}"
             f" (Algo: {self.algorithm}, MCAP: {self.market_cap})"
         )
 
