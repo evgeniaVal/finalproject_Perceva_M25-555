@@ -38,7 +38,7 @@ class Currency(ABC):
 
     @abstractmethod
     def get_display_info(self) -> str:
-        return f"{self.name} ({self.code})"
+        pass
 
 
 class FiatCurrency(Currency):
@@ -94,7 +94,7 @@ class CryptoCurrency(Currency):
     def get_display_info(self) -> str:
         return (
             f"[CRYPTO] {self.code} — {self.name}"
-            f" (Algo: {self.algorithm}, MCAP: {self.market_cap})"
+            f" (Algo: {self.algorithm}, MCAP: {self.market_cap:.2e})"
         )
 
 
